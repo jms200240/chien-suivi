@@ -1,36 +1,40 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Chien 🐾" />
-  <meta name="theme-color" content="#F7F8FC" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="Chien 🐾"/>
+  <meta name="theme-color" content="#F7F8FC"/>
   <title>Suivi du chien 🐾</title>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
+  <link rel="preconnect" href="https://www.gstatic.com"/>
+  <link rel="preconnect" href="https://unpkg.com"/>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; background: #F7F8FC; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
-    #root { min-height: 100vh; }
-    button { -webkit-tap-highlight-color: transparent; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;background:#F7F8FC}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+    #root{min-height:100vh}
+    button{-webkit-tap-highlight-color:transparent}
+    @keyframes dcpulse{0%,100%{opacity:1}50%{opacity:.78}}
   </style>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
   <script>
-    // ─── ⚙️  COLLE ICI TA CONFIG FIREBASE (étape 1.4 du guide) ─────────────
+    // ─── ⚙️  COLLE ICI TA CONFIG FIREBASE ───────────────────────────────────
     const firebaseConfig = {
-       apiKey: "AIzaSyCXiy1Y0nv5dFRw8Nf2yoQLAFnxBzfdxdU",
-       authDomain: "chien-suivi-7d81e.firebaseapp.com",
-       databaseURL: "https://chien-suivi-7d81e-default-rtdb.europe-west1.firebasedatabase.app",
-       projectId: "chien-suivi-7d81e",
-       storageBucket: "chien-suivi-7d81e.firebasestorage.app",
-       messagingSenderId: "38280363095",
-       appId: "1:38280363095:web:05e5dde3f831af7c93b712"
+      apiKey: "AIzaSyCXiy1Y0nv5dFRw8Nf2yoQLAFnxBzfdxdU",
+      authDomain: "chien-suivi-7d81e.firebaseapp.com",
+      databaseURL: "https://chien-suivi-7d81e-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "chien-suivi-7d81e",
+      storageBucket: "chien-suivi-7d81e.firebasestorage.app",
+      messagingSenderId: "38280363095",
+      appId: "1:38280363095:web:05e5dde3f831af7c93b712"
     };
     // ────────────────────────────────────────────────────────────────────────
     firebase.initializeApp(firebaseConfig);
@@ -38,399 +42,343 @@
   </script>
 </head>
 <body>
-  <div id="root"></div>
+<div id="root"></div>
+<script>
+  const {useState,useEffect,useCallback} = React;
+  const html = htm.bind(React.createElement);
 
-  <script type="text/babel">
-    const { useState, useEffect, useCallback } = React;
+  const DB_PATH = 'dogcare/v1/state';
+  const ME_KEY  = 'dogcare:me:v4';
 
-    const DB_PATH = 'dogcare/v1/state';
-    const ME_KEY  = 'dogcare:me:v4';
+  const loadShared = async () => { try{const s=await window._db.ref(DB_PATH).once('value');return s.exists()?s.val():null;}catch{return null;} };
+  const saveShared = async (s) => { try{await window._db.ref(DB_PATH).set(s);}catch(e){console.error(e);} };
+  const loadMe  = async () => localStorage.getItem(ME_KEY)||"";
+  const saveMe  = async (n) => localStorage.setItem(ME_KEY,n);
 
-    /* ---------- persistence ---------- */
-    const loadShared = async () => {
-      try { const s = await window._db.ref(DB_PATH).once('value'); return s.exists() ? s.val() : null; }
-      catch { return null; }
-    };
-    const saveShared = async (s) => {
-      try { await window._db.ref(DB_PATH).set(s); } catch(e) { console.error(e); }
-    };
-    const loadMe  = async () => localStorage.getItem(ME_KEY) || "";
-    const saveMe  = async (n) => localStorage.setItem(ME_KEY, n);
+  const pad = (n) => String(n).padStart(2,"0");
+  const todayStr  = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+  const mondayStr = () => { const d=new Date(),off=(d.getDay()+6)%7; d.setDate(d.getDate()-off); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+  const fmtTime   = (iso) => { if(!iso)return""; try{return new Date(iso).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});}catch{return"";} };
+  const fmtDate   = () => new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+  const probableLoc = () => { const d=new Date(),day=d.getDay(),h=d.getHours(); if(day>=1&&day<=4)return"paris"; if(day===5)return h<12?"paris":"vailly"; if(day===6)return"vailly"; return h>=18?"paris":"vailly"; };
 
-    /* ---------- helpers ---------- */
-    const pad = (n) => String(n).padStart(2, "0");
-    const todayStr  = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
-    const mondayStr = () => { const d=new Date(); const off=(d.getDay()+6)%7; d.setDate(d.getDate()-off); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
-    const fmtTime   = (iso) => { if(!iso)return""; try{return new Date(iso).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});}catch{return"";} };
-    const fmtDate   = () => new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
-    const probableLoc = () => { const d=new Date(),day=d.getDay(),h=d.getHours(); if(day>=1&&day<=4)return"paris"; if(day===5)return h<12?"paris":"vailly"; if(day===6)return"vailly"; if(day===0)return h>=18?"paris":"vailly"; return"paris"; };
+  const T = {bg:"#F7F8FC",panel:"#EEEFF7",text:"#20202F",sub:"#6B6B80",card:"#FFFFFF",border:"#E4E5F0",blue:"#4C6EF5",blueD:"#3651C0",green:"#16A34A",warn:"#F4B740",warnL:"#FAD27A",danger:"#DC2626",feed:"#EA580C",kibble:"#D97706",radius:16,font:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif"};
 
-    const T = {
-      bg:"#F7F8FC",panel:"#EEEFF7",text:"#20202F",sub:"#6B6B80",
-      card:"#FFFFFF",border:"#E4E5F0",blue:"#4C6EF5",blueD:"#3651C0",
-      green:"#16A34A",warn:"#F4B740",warnL:"#FAD27A",
-      danger:"#DC2626",feed:"#EA580C",kibble:"#D97706",
-      radius:16,font:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif"
-    };
+  const baseShape = () => ({dogName:"",members:["","","","","",""],day:todayStr(),matin:null,soir:null,walks:[],lastWalkAt:null,kibble:{paris:{low:false,by:null,at:null},vailly:{low:false,by:null,at:null}},week:{id:mondayStr(),feed:{},walk:{}}});
 
-    const baseShape = () => ({
-      dogName:"",members:["","","","","",""],
-      day:todayStr(),matin:null,soir:null,walks:[],lastWalkAt:null,
-      kibble:{paris:{low:false,by:null,at:null},vailly:{low:false,by:null,at:null}},
-      week:{id:mondayStr(),feed:{},walk:{}}
-    });
+  const fresh = (raw) => {
+    const b=baseShape(),s={...b,...(raw||{})};
+    let m=Array.isArray(s.members)?s.members.slice(0,6):[];while(m.length<6)m.push("");s.members=m;
+    s.walks=Array.isArray(s.walks)?s.walks:[];
+    s.kibble={paris:{...b.kibble.paris,...(s.kibble?.paris||{})},vailly:{...b.kibble.vailly,...(s.kibble?.vailly||{})}};
+    s.week=(s.week&&typeof s.week==="object")?s.week:{id:mondayStr(),feed:{},walk:{}};
+    if(s.day!==todayStr()){s.day=todayStr();s.matin=null;s.soir=null;s.walks=[];}
+    if(s.week.id!==mondayStr())s.week={id:mondayStr(),feed:{},walk:{}};
+    if(!s.week.feed)s.week.feed={};if(!s.week.walk)s.week.walk={};
+    return s;
+  };
 
-    const fresh = (raw) => {
-      const b=baseShape(), s={...b,...(raw||{})};
-      let m=Array.isArray(s.members)?s.members.slice(0,6):[]; while(m.length<6)m.push(""); s.members=m;
-      s.walks=Array.isArray(s.walks)?s.walks:[];
-      s.kibble={paris:{...b.kibble.paris,...(s.kibble?.paris||{})},vailly:{...b.kibble.vailly,...(s.kibble?.vailly||{})}};
-      s.week=(s.week&&typeof s.week==="object")?s.week:{id:mondayStr(),feed:{},walk:{}};
-      if(s.day!==todayStr()){s.day=todayStr();s.matin=null;s.soir=null;s.walks=[];}
-      if(s.week.id!==mondayStr())s.week={id:mondayStr(),feed:{},walk:{}};
-      if(!s.week.feed)s.week.feed={}; if(!s.week.walk)s.week.walk={};
-      return s;
-    };
+  const topOf = (obj) => {const e=Object.entries(obj||{}).filter(([,v])=>v>0);if(!e.length)return{name:null,count:0};const max=Math.max(...e.map(x=>x[1]));const tied=e.filter(x=>x[1]===max).map(x=>x[0]);return{name:tied.length>1?`Égalité (${tied.join(", ")})`:tied[0],count:max};};
 
-    /* ===== GLYPHES ===== */
-    const BowlGlyph = () => (<g><path d="M22 58 L29 82 Q30 88 37 88 L63 88 Q70 88 71 82 L78 58 Z" fill="#E2574C"/><ellipse cx="50" cy="58" rx="30" ry="9" fill="#D44C42"/><ellipse cx="50" cy="56" rx="23" ry="6" fill="#8E4D2C"/><circle cx="50" cy="49" r="8" fill="#A9683A"/><circle cx="40" cy="52" r="6" fill="#B5763F"/><circle cx="60" cy="52" r="6" fill="#8E5A2E"/></g>);
-    const LeashGlyph = () => (<g><ellipse cx="34" cy="26" rx="14" ry="11" fill="none" stroke="#E2574C" strokeWidth="9"/><path d="M43 34 C66 45 40 62 55 74" fill="none" stroke="#E2574C" strokeWidth="9" strokeLinecap="round"/><rect x="50" y="70" width="11" height="14" rx="4" fill="#A9B2BF"/></g>);
-    const KibbleLowGlyph = () => (<g><rect x="22" y="24" width="56" height="54" rx="10" fill="none" stroke="#B45309" strokeWidth="8"/><rect x="31" y="56" width="38" height="14" rx="4" fill="#B45309"/><path d="M50 30 l0 16 M41 39 l9 9 l9 -9" fill="none" stroke="#B45309" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/></g>);
-    const Sun  = ({s=20}) => (<svg width={s} height={s} viewBox="0 0 24 24"><g stroke="#F5A623" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="1.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22.5" y2="12"/><line x1="4.6" y1="4.6" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="19.4" y2="19.4"/><line x1="19.4" y1="4.6" x2="17.3" y2="6.7"/><line x1="6.7" y1="17.3" x2="4.6" y2="19.4"/></g><circle cx="12" cy="12" r="5" fill="#F5A623"/></svg>);
-    const Moon = ({s=20}) => (<svg width={s} height={s} viewBox="0 0 24 24"><path d="M15 3 A9 9 0 1 0 15 21 A7 7 0 1 1 15 3 Z" fill="#8C92C4"/></svg>);
+  /* ===== GLYPHES ===== */
+  const BowlGlyph = () => html`<g><path d="M22 58 L29 82 Q30 88 37 88 L63 88 Q70 88 71 82 L78 58 Z" fill="#E2574C"/><ellipse cx="50" cy="58" rx="30" ry="9" fill="#D44C42"/><ellipse cx="50" cy="56" rx="23" ry="6" fill="#8E4D2C"/><circle cx="50" cy="49" r="8" fill="#A9683A"/><circle cx="40" cy="52" r="6" fill="#B5763F"/><circle cx="60" cy="52" r="6" fill="#8E5A2E"/></g>`;
+  const LeashGlyph = () => html`<g><ellipse cx="34" cy="26" rx="14" ry="11" fill="none" stroke="#E2574C" strokeWidth="9"/><path d="M43 34 C66 45 40 62 55 74" fill="none" stroke="#E2574C" strokeWidth="9" strokeLinecap="round"/><rect x="50" y="70" width="11" height="14" rx="4" fill="#A9B2BF"/></g>`;
+  const KibbleLowGlyph = () => html`<g><rect x="22" y="24" width="56" height="54" rx="10" fill="none" stroke="#B45309" strokeWidth="8"/><rect x="31" y="56" width="38" height="14" rx="4" fill="#B45309"/><path d="M50 30 l0 16 M41 39 l9 9 l9 -9" fill="none" stroke="#B45309" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/></g>`;
+  const Sun  = ({s=20}) => html`<svg width=${s} height=${s} viewBox="0 0 24 24"><g stroke="#F5A623" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="1.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22.5" y2="12"/><line x1="4.6" y1="4.6" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="19.4" y2="19.4"/><line x1="19.4" y1="4.6" x2="17.3" y2="6.7"/><line x1="6.7" y1="17.3" x2="4.6" y2="19.4"/></g><circle cx="12" cy="12" r="5" fill="#F5A623"/></svg>`;
+  const Moon = ({s=20}) => html`<svg width=${s} height=${s} viewBox="0 0 24 24"><path d="M15 3 A9 9 0 1 0 15 21 A7 7 0 1 1 15 3 Z" fill="#8C92C4"/></svg>`;
+  const Pine = ({x,y,s=1}) => html`<g><rect x=${x-2.2} y=${y-3} width="4.4" height="9" fill="#7A5230"/><polygon points=${`${x},${y-32*s} ${x-13*s},${y} ${x+13*s},${y}`} fill="#2F7D4F"/><polygon points=${`${x},${y-44*s} ${x-10*s},${y-16*s} ${x+10*s},${y-16*s}`} fill="#3A9A62"/></g>`;
 
-    /* ===== COMPOSANTS ===== */
-    function MealBowl({slot,accent,label,fed,who,at,onClick}){
-      const [l1,...rest]=label.split(" "); const l2=rest.join(" ");
-      return(
-        <button onClick={onClick} style={{background:"none",border:"none",padding:0,cursor:"pointer",width:"100%"}}>
-          <svg viewBox="0 0 160 112" width="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs><filter id={`glow-${slot}`} x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#10B981" floodOpacity="0.95"/></filter></defs>
-            <g filter={fed?`url(#glow-${slot})`:undefined}>
-              <path d="M30 50 L43 90 Q45 98 56 98 L104 98 Q115 98 117 90 L130 50 Z" fill={fed?"#9AA7C7":T.blue}/>
-              <ellipse cx="80" cy="50" rx="54" ry="13" fill={fed?"#9AA7C7":T.blue}/>
-              <ellipse cx="80" cy="48" rx="42" ry="8" fill={fed?"#7E8BAE":T.blueD}/>
-            </g>
-            {fed&&(<g>
-              <path d="M30 50 L43 90 Q45 98 56 98 L104 98 Q115 98 117 90 L130 50" fill="none" stroke="#10B981" strokeWidth="4.5" strokeLinejoin="round" strokeLinecap="round"/>
-              <ellipse cx="80" cy="50" rx="54" ry="13" fill="none" stroke="#10B981" strokeWidth="4.5"/>
-              <circle cx="126" cy="28" r="14" fill="#10B981"/>
-              <path d="M119 28 l5 5 l9 -10" fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round"/>
-            </g>)}
-            <text textAnchor="middle" fontWeight="800" fill="#fff" style={{fontFamily:T.font}}>
-              <tspan x="80" y="70" fontSize="13.5">{l1}</tspan>
-              <tspan x="80" y="86" fontSize="13.5">{l2}</tspan>
-            </text>
-          </svg>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:2,minHeight:18}}>
-            {accent==="sun"?<Sun s={15}/>:<Moon s={15}/>}
-            <span style={{fontSize:12,color:fed?"#10B981":T.sub,fontWeight:600}}>{fed?`${who} · ${fmtTime(at)} · ↩︎`:"à faire"}</span>
-          </div>
-        </button>
-      );
-    }
+  /* ===== COMPOSANTS ===== */
+  function MealBowl({slot,accent,label,fed,who,at,onClick}){
+    const [l1,...rest]=label.split(" ");const l2=rest.join(" ");
+    return html`<button onClick=${onClick} style=${{background:"none",border:"none",padding:0,cursor:"pointer",width:"100%"}}>
+      <svg viewBox="0 0 160 112" width="100%" xmlns="http://www.w3.org/2000/svg">
+        <defs><filter id=${`glow-${slot}`} x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#10B981" floodOpacity="0.95"/></filter></defs>
+        <g filter=${fed?`url(#glow-${slot})`:undefined}>
+          <path d="M30 50 L43 90 Q45 98 56 98 L104 98 Q115 98 117 90 L130 50 Z" fill=${fed?"#9AA7C7":T.blue}/>
+          <ellipse cx="80" cy="50" rx="54" ry="13" fill=${fed?"#9AA7C7":T.blue}/>
+          <ellipse cx="80" cy="48" rx="42" ry="8" fill=${fed?"#7E8BAE":T.blueD}/>
+        </g>
+        ${fed&&html`<g>
+          <path d="M30 50 L43 90 Q45 98 56 98 L104 98 Q115 98 117 90 L130 50" fill="none" stroke="#10B981" strokeWidth="4.5" strokeLinejoin="round" strokeLinecap="round"/>
+          <ellipse cx="80" cy="50" rx="54" ry="13" fill="none" stroke="#10B981" strokeWidth="4.5"/>
+          <circle cx="126" cy="28" r="14" fill="#10B981"/>
+          <path d="M119 28 l5 5 l9 -10" fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round"/>
+        </g>`}
+        <text textAnchor="middle" fontWeight="800" fill="#fff" style=${{fontFamily:T.font}}>
+          <tspan x="80" y="70" fontSize="13.5">${l1}</tspan>
+          <tspan x="80" y="86" fontSize="13.5">${l2}</tspan>
+        </text>
+      </svg>
+      <div style=${{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:2,minHeight:18}}>
+        ${accent==="sun"?html`<${Sun} s=${15}/>`:html`<${Moon} s=${15}/>`}
+        <span style=${{fontSize:12,color:fed?"#10B981":T.sub,fontWeight:600}}>${fed?`${who} · ${fmtTime(at)} · ↩︎`:"à faire"}</span>
+      </div>
+    </button>`;
+  }
 
-    const Pine=({x,y,s=1})=>(<g><rect x={x-2.2} y={y-3} width="4.4" height="9" fill="#7A5230"/><polygon points={`${x},${y-32*s} ${x-13*s},${y} ${x+13*s},${y}`} fill="#2F7D4F"/><polygon points={`${x},${y-44*s} ${x-10*s},${y-16*s} ${x+10*s},${y-16*s}`} fill="#3A9A62"/></g>);
+  function WalkBig({count,onClick}){
+    return html`<button onClick=${onClick} style=${{background:"none",border:"none",padding:0,cursor:"pointer",width:"100%",position:"relative"}}>
+      <svg viewBox="0 0 320 116" width="100%" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <clipPath id="wc2"><rect x="0" y="0" width="320" height="116" rx="20"/></clipPath>
+          <filter id="tsh2"><feDropShadow dx="0" dy="1.5" stdDeviation="1.5" floodColor="#14532D" floodOpacity="0.85"/></filter>
+        </defs>
+        <g clipPath="url(#wc2)">
+          <rect width="320" height="116" fill="#D7F0E2"/>
+          <circle cx="276" cy="30" r="15" fill="#F6C544"/>
+          <path d="M-10 70 Q 80 44 170 64 T 340 60 L340 116 L-10 116 Z" fill="#9FDBB0"/>
+          <${Pine} x=${34} y=${78} s=${1.05}/><${Pine} x=${60} y=${82} s=${1.25}/><${Pine} x=${86} y=${78} s=${1.0}/><${Pine} x=${300} y=${86} s=${1.1}/>
+          <path d="M-10 86 Q 110 66 230 86 T 340 84 L340 116 L-10 116 Z" fill="#5FB877"/>
+          <path d="M-10 100 Q 160 86 340 100 L340 116 L-10 116 Z" fill="#46A35F"/>
+          <circle cx="150" cy="98" r="2.2" fill="#fff"/><circle cx="186" cy="104" r="2.2" fill="#FCE38A"/><circle cx="120" cy="106" r="2.2" fill="#fff"/><circle cx="214" cy="100" r="2.2" fill="#F7A8C4"/>
+        </g>
+        <g filter="url(#tsh2)">
+          <text x="160" y="56" textAnchor="middle" fontSize="23" fontWeight="900" fill="#fff" style=${{fontFamily:T.font}}>Promenade</text>
+          <text x="160" y="74" textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#EAFBF0" style=${{fontFamily:T.font}}>1 clic = horodatage</text>
+        </g>
+      </svg>
+      <div style=${{position:"absolute",top:8,right:10,background:"rgba(255,255,255,0.92)",color:"#16A34A",fontWeight:800,fontSize:12,borderRadius:20,padding:"3px 9px"}}>${count} aujourd'hui</div>
+    </button>`;
+  }
 
-    function WalkBig({count,onClick}){
-      return(
-        <button onClick={onClick} style={{background:"none",border:"none",padding:0,cursor:"pointer",width:"100%",position:"relative"}}>
-          <svg viewBox="0 0 320 116" width="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs><clipPath id="wc2"><rect x="0" y="0" width="320" height="116" rx="20"/></clipPath><filter id="tsh2"><feDropShadow dx="0" dy="1.5" stdDeviation="1.5" floodColor="#14532D" floodOpacity="0.85"/></filter></defs>
-            <g clipPath="url(#wc2)">
-              <rect width="320" height="116" fill="#D7F0E2"/><circle cx="276" cy="30" r="15" fill="#F6C544"/>
-              <path d="M-10 70 Q 80 44 170 64 T 340 60 L340 116 L-10 116 Z" fill="#9FDBB0"/>
-              <Pine x={34} y={78} s={1.05}/><Pine x={60} y={82} s={1.25}/><Pine x={86} y={78} s={1.0}/><Pine x={300} y={86} s={1.1}/>
-              <path d="M-10 86 Q 110 66 230 86 T 340 84 L340 116 L-10 116 Z" fill="#5FB877"/>
-              <path d="M-10 100 Q 160 86 340 100 L340 116 L-10 116 Z" fill="#46A35F"/>
-              <circle cx="150" cy="98" r="2.2" fill="#fff"/><circle cx="186" cy="104" r="2.2" fill="#FCE38A"/><circle cx="120" cy="106" r="2.2" fill="#fff"/><circle cx="214" cy="100" r="2.2" fill="#F7A8C4"/>
-            </g>
-            <g filter="url(#tsh2)">
-              <text x="160" y="56" textAnchor="middle" fontSize="23" fontWeight="900" fill="#fff" style={{fontFamily:T.font}}>Promenade</text>
-              <text x="160" y="74" textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#EAFBF0" style={{fontFamily:T.font}}>1 clic = horodatage</text>
-            </g>
-          </svg>
-          <div style={{position:"absolute",top:8,right:10,background:"rgba(255,255,255,0.92)",color:"#16A34A",fontWeight:800,fontSize:12,borderRadius:20,padding:"3px 9px"}}>{count} aujourd'hui</div>
-        </button>
-      );
-    }
+  function Trophy({id,kind,title,name,count,unit}){
+    return html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,padding:14,textAlign:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
+      <svg width="58" height="66" viewBox="0 0 64 74" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id=${`gold-${id}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFE27A"/><stop offset="1" stopColor="#E0A81E"/></linearGradient></defs>
+        <path d="M16 14 C6 14 6 30 19 30" fill="none" stroke="#E0A81E" strokeWidth="4"/>
+        <path d="M48 14 C58 14 58 30 45 30" fill="none" stroke="#E0A81E" strokeWidth="4"/>
+        <path d="M15 8 H49 V20 C49 33 42 41 32 41 C22 41 15 33 15 20 Z" fill=${`url(#gold-${id})`}/>
+        <circle cx="32" cy="22" r="9" fill="#fff" opacity="0.92"/>
+        <g transform="translate(20,10) scale(0.24)">${kind==="feed"?html`<${BowlGlyph}/>`:html`<${LeashGlyph}/>`}</g>
+        <rect x="29" y="41" width="6" height="9" fill="#C9941F"/>
+        <rect x="22" y="50" width="20" height="5" rx="2" fill="#C9941F"/>
+        <rect x="17" y="55" width="30" height="7" rx="3" fill="#B8860B"/>
+      </svg>
+      <div style=${{fontSize:12.5,fontWeight:800,color:T.sub,marginTop:2}}>${title}</div>
+      <div style=${{fontSize:17,fontWeight:900,color:T.text,marginTop:2}}>${name||"—"}</div>
+      <div style=${{fontSize:12,color:T.sub}}>${count>0?`${count} ${unit} cette semaine`:"aucun encore"}</div>
+    </div>`;
+  }
 
-    function Trophy({id,kind,title,name,count,unit}){
-      return(
-        <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,padding:14,textAlign:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
-          <svg width="58" height="66" viewBox="0 0 64 74" xmlns="http://www.w3.org/2000/svg">
-            <defs><linearGradient id={`gold-${id}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFE27A"/><stop offset="1" stopColor="#E0A81E"/></linearGradient></defs>
-            <path d="M16 14 C6 14 6 30 19 30" fill="none" stroke="#E0A81E" strokeWidth="4"/>
-            <path d="M48 14 C58 14 58 30 45 30" fill="none" stroke="#E0A81E" strokeWidth="4"/>
-            <path d="M15 8 H49 V20 C49 33 42 41 32 41 C22 41 15 33 15 20 Z" fill={`url(#gold-${id})`}/>
-            <circle cx="32" cy="22" r="9" fill="#fff" opacity="0.92"/>
-            <g transform="translate(20,10) scale(0.24)">{kind==="feed"?<BowlGlyph/>:<LeashGlyph/>}</g>
-            <rect x="29" y="41" width="6" height="9" fill="#C9941F"/>
-            <rect x="22" y="50" width="20" height="5" rx="2" fill="#C9941F"/>
-            <rect x="17" y="55" width="30" height="7" rx="3" fill="#B8860B"/>
-          </svg>
-          <div style={{fontSize:12.5,fontWeight:800,color:T.sub,marginTop:2}}>{title}</div>
-          <div style={{fontSize:17,fontWeight:900,color:T.text,marginTop:2}}>{name||"—"}</div>
-          <div style={{fontSize:12,color:T.sub}}>{count>0?`${count} ${unit} cette semaine`:"aucun encore"}</div>
+  function ClockPicker({initialIso,onCancel,onConfirm}){
+    const d0=new Date(initialIso);
+    const [hour,setHour]=useState(d0.getHours());
+    const [minute,setMinute]=useState((Math.round(d0.getMinutes()/5)*5)%60);
+    const [mode,setMode]=useState("hour");
+    const cx=130,cy=130,ro=104,ri=66,acc=T.blue;
+    const pos=(i,r)=>{const a=i*30*Math.PI/180;return{x:cx+r*Math.sin(a),y:cy-r*Math.cos(a)};};
+    const outer=[12,1,2,3,4,5,6,7,8,9,10,11];
+    const inner=[0,13,14,15,16,17,18,19,20,21,22,23];
+    const mins=[0,5,10,15,20,25,30,35,40,45,50,55];
+    let hand;if(mode==="hour"){const io=outer.indexOf(hour);hand=io>=0?pos(io,ro):pos(inner.indexOf(hour),ri);}else hand=pos(minute/5,ro);
+    const confirm=()=>{const d=new Date(initialIso);d.setHours(hour,minute,0,0);onConfirm(d.toISOString());};
+    return html`<div style=${{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,zIndex:60}}>
+      <div style=${{background:"#fff",borderRadius:20,padding:18,width:300,fontFamily:T.font}}>
+        <div style=${{fontSize:12.5,color:T.sub,fontWeight:700,marginBottom:6}}>Modifier l'heure de la promenade</div>
+        <div style=${{textAlign:"center",marginBottom:10}}>
+          <span onClick=${()=>setMode("hour")} style=${{fontSize:38,fontWeight:800,color:mode==="hour"?acc:T.text,background:mode==="hour"?"#E7ECFE":"transparent",borderRadius:10,padding:"2px 8px",cursor:"pointer"}}>${pad(hour)}</span>
+          <span style=${{fontSize:34,fontWeight:800,color:T.sub}}>:</span>
+          <span onClick=${()=>setMode("minute")} style=${{fontSize:38,fontWeight:800,color:mode==="minute"?acc:T.text,background:mode==="minute"?"#E7ECFE":"transparent",borderRadius:10,padding:"2px 8px",cursor:"pointer"}}>${pad(minute)}</span>
         </div>
-      );
-    }
-
-    function ClockPicker({initialIso,onCancel,onConfirm}){
-      const d0=new Date(initialIso);
-      const [hour,setHour]=useState(d0.getHours());
-      const [minute,setMinute]=useState((Math.round(d0.getMinutes()/5)*5)%60);
-      const [mode,setMode]=useState("hour");
-      const cx=130,cy=130,ro=104,ri=66,acc=T.blue;
-      const pos=(i,r)=>{const a=i*30*Math.PI/180;return{x:cx+r*Math.sin(a),y:cy-r*Math.cos(a)};};
-      const outer=[12,1,2,3,4,5,6,7,8,9,10,11];
-      const inner=[0,13,14,15,16,17,18,19,20,21,22,23];
-      const mins=[0,5,10,15,20,25,30,35,40,45,50,55];
-      let hand; if(mode==="hour"){const io=outer.indexOf(hour);hand=io>=0?pos(io,ro):pos(inner.indexOf(hour),ri);}else hand=pos(minute/5,ro);
-      const confirm=()=>{const d=new Date(initialIso);d.setHours(hour,minute,0,0);onConfirm(d.toISOString());};
-      const Dig=({active,children,onClick})=>(<span onClick={onClick} style={{fontSize:38,fontWeight:800,color:active?acc:T.text,background:active?"#E7ECFE":"transparent",borderRadius:10,padding:"2px 8px",cursor:"pointer"}}>{children}</span>);
-      return(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,zIndex:60}}>
-          <div style={{background:"#fff",borderRadius:20,padding:18,width:300,fontFamily:T.font}}>
-            <div style={{fontSize:12.5,color:T.sub,fontWeight:700,marginBottom:6}}>Modifier l'heure de la promenade</div>
-            <div style={{textAlign:"center",marginBottom:10}}>
-              <Dig active={mode==="hour"} onClick={()=>setMode("hour")}>{pad(hour)}</Dig>
-              <span style={{fontSize:34,fontWeight:800,color:T.sub}}>:</span>
-              <Dig active={mode==="minute"} onClick={()=>setMode("minute")}>{pad(minute)}</Dig>
-            </div>
-            <svg viewBox="0 0 260 260" width="100%" style={{display:"block"}} xmlns="http://www.w3.org/2000/svg">
-              <circle cx={cx} cy={cy} r="124" fill="#F1F1F8"/>
-              <line x1={cx} y1={cy} x2={hand.x} y2={hand.y} stroke={acc} strokeWidth="2.5"/>
-              <circle cx={cx} cy={cy} r="4" fill={acc}/><circle cx={hand.x} cy={hand.y} r="18" fill={acc}/>
-              {mode==="hour"?(<>
-                {outer.map((v,i)=>{const p=pos(i,ro);return(<text key={"o"+v} x={p.x} y={p.y} dy="5" textAnchor="middle" fontSize="15" fontWeight="700" fill={v===hour?"#fff":T.text} style={{cursor:"pointer"}} onClick={()=>{setHour(v);setMode("minute");}}>{pad(v)}</text>);})}
-                {inner.map((v,i)=>{const p=pos(i,ri);return(<text key={"i"+v} x={p.x} y={p.y} dy="4" textAnchor="middle" fontSize="12.5" fontWeight="700" fill={v===hour?"#fff":T.sub} style={{cursor:"pointer"}} onClick={()=>{setHour(v);setMode("minute");}}>{pad(v)}</text>);})}
-              </>):(mins.map((v,i)=>{const p=pos(i,ro);return(<text key={"m"+v} x={p.x} y={p.y} dy="5" textAnchor="middle" fontSize="15" fontWeight="700" fill={v===minute?"#fff":T.text} style={{cursor:"pointer"}} onClick={()=>setMinute(v)}>{pad(v)}</text>);}))}
-            </svg>
-            <div style={{display:"flex",gap:8,marginTop:14}}>
-              <button onClick={onCancel} style={{flex:1,background:T.panel,color:T.text,border:"none",borderRadius:14,padding:"11px",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:T.font}}>Annuler</button>
-              <button onClick={confirm} style={{flex:1,background:acc,color:"#fff",border:"none",borderRadius:14,padding:"11px",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:T.font}}>OK</button>
-            </div>
-          </div>
+        <svg viewBox="0 0 260 260" width="100%" xmlns="http://www.w3.org/2000/svg">
+          <circle cx=${cx} cy=${cy} r="124" fill="#F1F1F8"/>
+          <line x1=${cx} y1=${cy} x2=${hand.x} y2=${hand.y} stroke=${acc} strokeWidth="2.5"/>
+          <circle cx=${cx} cy=${cy} r="4" fill=${acc}/>
+          <circle cx=${hand.x} cy=${hand.y} r="18" fill=${acc}/>
+          ${mode==="hour"?html`<g>
+            ${outer.map((v,i)=>{const p=pos(i,ro);return html`<text key=${"o"+v} x=${p.x} y=${p.y} dy="5" textAnchor="middle" fontSize="15" fontWeight="700" fill=${v===hour?"#fff":T.text} style=${{cursor:"pointer"}} onClick=${()=>{setHour(v);setMode("minute");}}>${pad(v)}</text>`;})}
+            ${inner.map((v,i)=>{const p=pos(i,ri);return html`<text key=${"i"+v} x=${p.x} y=${p.y} dy="4" textAnchor="middle" fontSize="12.5" fontWeight="700" fill=${v===hour?"#fff":T.sub} style=${{cursor:"pointer"}} onClick=${()=>{setHour(v);setMode("minute");}}>${pad(v)}</text>`;})}
+          </g>`:html`<g>${mins.map((v,i)=>{const p=pos(i,ro);return html`<text key=${"m"+v} x=${p.x} y=${p.y} dy="5" textAnchor="middle" fontSize="15" fontWeight="700" fill=${v===minute?"#fff":T.text} style=${{cursor:"pointer"}} onClick=${()=>setMinute(v)}>${pad(v)}</text>`;})}</g>`}
+        </svg>
+        <div style=${{display:"flex",gap:8,marginTop:14}}>
+          <button onClick=${onCancel} style=${{flex:1,background:T.panel,color:T.text,border:"none",borderRadius:14,padding:"11px",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:T.font}}>Annuler</button>
+          <button onClick=${confirm} style=${{flex:1,background:acc,color:"#fff",border:"none",borderRadius:14,padding:"11px",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:T.font}}>OK</button>
         </div>
-      );
-    }
+      </div>
+    </div>`;
+  }
 
-    function SettingsModal({initial,onClose,onSave}){
-      const [dogName,setDogName]=useState(initial.dogName||"");
-      const [members,setMembers]=useState(initial.members.slice());
-      const setM=(i,v)=>setMembers(arr=>arr.map((x,j)=>j===i?v:x));
-      return(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,zIndex:50}}>
-          <div style={{background:T.card,borderRadius:T.radius,padding:20,maxWidth:420,width:"100%",fontFamily:T.font,maxHeight:"90vh",overflowY:"auto"}}>
-            <div style={{fontWeight:900,fontSize:18,marginBottom:14,color:T.text}}>⚙️ Réglages</div>
-            <label style={{fontSize:13,color:T.sub,fontWeight:700}}>Nom du chien</label>
-            <input value={dogName} onChange={e=>setDogName(e.target.value)} placeholder="ex. Pongo"
-              style={{width:"100%",boxSizing:"border-box",marginTop:5,marginBottom:16,padding:"10px 12px",borderRadius:12,border:`1px solid ${T.border}`,fontSize:15,fontFamily:T.font,color:T.text}}/>
-            <label style={{fontSize:13,color:T.sub,fontWeight:700}}>Prénoms du foyer (jusqu'à 6)</label>
-            <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:6}}>
-              {members.map((n,i)=>(<input key={i} value={n} placeholder={`Personne ${i+1}`} onChange={e=>setM(i,e.target.value)}
-                style={{width:"100%",boxSizing:"border-box",padding:"10px 12px",borderRadius:12,border:`1px solid ${T.border}`,fontSize:15,fontFamily:T.font,color:T.text}}/>))}
-            </div>
-            <div style={{display:"flex",gap:8,marginTop:18}}>
-              <button onClick={onClose} style={{flex:1,background:T.panel,color:T.text,border:"none",borderRadius:T.radius,padding:"12px",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:T.font}}>Annuler</button>
-              <button onClick={()=>{onSave({dogName,members});onClose();}} style={{flex:2,background:T.blue,color:"#fff",border:"none",borderRadius:T.radius,padding:"12px",fontWeight:800,fontSize:15,cursor:"pointer",fontFamily:T.font}}>Enregistrer</button>
-            </div>
-          </div>
+  function SettingsModal({initial,onClose,onSave}){
+    const [dogName,setDogName]=useState(initial.dogName||"");
+    const [members,setMembers]=useState(initial.members.slice());
+    const setM=(i,v)=>setMembers(arr=>arr.map((x,j)=>j===i?v:x));
+    return html`<div style=${{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,zIndex:50}}>
+      <div style=${{background:T.card,borderRadius:T.radius,padding:20,maxWidth:420,width:"100%",fontFamily:T.font,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style=${{fontWeight:900,fontSize:18,marginBottom:14,color:T.text}}>⚙️ Réglages</div>
+        <label style=${{fontSize:13,color:T.sub,fontWeight:700}}>Nom du chien</label>
+        <input value=${dogName} onChange=${e=>setDogName(e.target.value)} placeholder="ex. Scoubidou"
+          style=${{width:"100%",boxSizing:"border-box",marginTop:5,marginBottom:16,padding:"10px 12px",borderRadius:12,border:`1px solid ${T.border}`,fontSize:15,fontFamily:T.font,color:T.text}}/>
+        <label style=${{fontSize:13,color:T.sub,fontWeight:700}}>Prénoms du foyer (jusqu'à 6)</label>
+        <div style=${{display:"flex",flexDirection:"column",gap:8,marginTop:6}}>
+          ${members.map((n,i)=>html`<input key=${i} value=${n} placeholder=${`Personne ${i+1}`} onChange=${e=>setM(i,e.target.value)}
+            style=${{width:"100%",boxSizing:"border-box",padding:"10px 12px",borderRadius:12,border:`1px solid ${T.border}`,fontSize:15,fontFamily:T.font,color:T.text}}/>`)}
         </div>
-      );
-    }
+        <div style=${{display:"flex",gap:8,marginTop:18}}>
+          <button onClick=${onClose} style=${{flex:1,background:T.panel,color:T.text,border:"none",borderRadius:T.radius,padding:"12px",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:T.font}}>Annuler</button>
+          <button onClick=${()=>{onSave({dogName,members});onClose();}} style=${{flex:2,background:T.blue,color:"#fff",border:"none",borderRadius:T.radius,padding:"12px",fontWeight:800,fontSize:15,cursor:"pointer",fontFamily:T.font}}>Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+  }
 
-    const topOf = (obj) => {
-      const e=Object.entries(obj||{}).filter(([,v])=>v>0);
-      if(!e.length)return{name:null,count:0};
-      const max=Math.max(...e.map(x=>x[1]));
-      const tied=e.filter(x=>x[1]===max).map(x=>x[0]);
-      return{name:tied.length>1?`Égalité (${tied.join(", ")})`:tied[0],count:max};
+  /* ===== COMPOSANT PRINCIPAL ===== */
+  function DogCare(){
+    const [state,setState]=useState(null);
+    const [me,setMe]=useState("");
+    const [showSettings,setShowSettings]=useState(false);
+    const [showWho,setShowWho]=useState(false);
+    const [editIdx,setEditIdx]=useState(null);
+    const [lastSync,setLastSync]=useState(null);
+    const [nudge,setNudge]=useState(false);
+    const [,setTick]=useState(0);
+
+    useEffect(()=>{
+      const ref=window._db.ref(DB_PATH);
+      const handler=ref.on('value',(snap)=>{
+        const raw=snap.exists()?snap.val():null;
+        if(!raw){const s=baseShape();saveShared(s).then(()=>{setState(s);setShowSettings(true);});}
+        else setState(fresh(raw));
+        setLastSync(new Date());
+      });
+      loadMe().then(m=>setMe(m));
+      const t=setInterval(()=>setTick(x=>x+1),60000);
+      return()=>{ref.off('value',handler);clearInterval(t);};
+    },[]);
+
+    useEffect(()=>{if(state&&state.members.every(x=>!x.trim()))setShowSettings(true);},[state]);
+
+    const mutate=useCallback(async(fn)=>{
+      const snap=await window._db.ref(DB_PATH).once('value');
+      const raw=snap.exists()?snap.val():baseShape();
+      const next=fn(JSON.parse(JSON.stringify(fresh(raw))));
+      await saveShared(next);
+    },[]);
+
+    const requireMe=()=>{if(!me){setNudge(true);setShowWho(true);setTimeout(()=>setNudge(false),2500);return false;}return true;};
+    const toggleMeal=(slot)=>{
+      if(state[slot]){mutate(s=>{const by=s[slot]?.by;if(by)s.week.feed[by]=Math.max(0,(s.week.feed[by]||0)-1);s[slot]=null;return s;});return;}
+      if(!requireMe())return;
+      mutate(s=>{s[slot]={by:me,at:new Date().toISOString()};s.week.feed[me]=(s.week.feed[me]||0)+1;return s;});
+    };
+    const addWalk=()=>{if(!requireMe())return;mutate(s=>{const iso=new Date().toISOString();s.walks.push({by:me,at:iso});s.lastWalkAt=iso;s.week.walk[me]=(s.week.walk[me]||0)+1;return s;});};
+    const removeWalk=(i)=>mutate(s=>{const by=s.walks[i]?.by;if(by)s.week.walk[by]=Math.max(0,(s.week.walk[by]||0)-1);s.walks.splice(i,1);s.lastWalkAt=s.walks.length?s.walks[s.walks.length-1].at:null;return s;});
+    const setWalkTime=(i,iso)=>mutate(s=>{if(s.walks[i])s.walks[i].at=iso;s.walks.sort((a,b)=>new Date(a.at)-new Date(b.at));s.lastWalkAt=s.walks.length?s.walks[s.walks.length-1].at:null;return s;});
+    const toggleKibble=(loc)=>{if(!requireMe())return;mutate(s=>{const c=s.kibble[loc];s.kibble[loc]=c.low?{low:false,by:null,at:null}:{low:true,by:me,at:new Date().toISOString()};return s;});};
+
+    if(!state)return html`<div style=${{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",fontSize:16,color:T.sub,fontFamily:T.font}}>Connexion en cours… 🐾</div>`;
+
+    const members=state.members.filter(x=>x.trim());
+    const loc=probableLoc();
+    const now=new Date(),hour=now.getHours(),dow=now.getDay(),isWeekday=dow>=1&&dow<=5;
+    const sinceWalk=state.lastWalkAt?(now-new Date(state.lastWalkAt))/3600000:Infinity;
+    const walkAlert=isWeekday&&hour>=7&&hour<21&&sinceWalk>4;
+    const matinAlert=hour>=7&&!state.matin;
+    const soirAlert=hour>=18&&!state.soir;
+    const champFeed=topOf(state.week.feed),champWalk=topOf(state.week.walk);
+    const card=(e={})=>({background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,padding:16,boxShadow:"0 1px 3px rgba(0,0,0,0.04)",...e});
+
+    const Banner=({bg,Glyph,text})=>html`<div style=${{background:bg,color:"#fff",borderRadius:T.radius,padding:"11px 14px",fontWeight:800,fontSize:15.5,display:"flex",alignItems:"center",gap:12,marginBottom:9,boxShadow:"0 3px 12px rgba(0,0,0,0.16)",animation:"dcpulse 1.7s ease-in-out infinite"}}>
+      <span style=${{width:38,height:38,borderRadius:"50%",background:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        <svg width="24" height="24" viewBox="0 0 100 100"><${Glyph}/></svg>
+      </span>
+      <span>${text}</span>
+    </div>`;
+
+    const KibbleCard=({loc:l,name})=>{
+      const k=state.kibble[l],here=loc===l;
+      return html`<div style=${card({border:k.low?`2px solid ${T.danger}`:`1px solid ${T.border}`,background:k.low?"#FEF2F2":T.card})}>
+        <div style=${{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+          <span style=${{fontWeight:800,fontSize:16}}>📍 ${name}</span>
+          ${here&&html`<span style=${{fontSize:11,fontWeight:700,color:T.blue,background:T.panel,padding:"3px 8px",borderRadius:20}}>lieu probable</span>`}
+        </div>
+        ${k.low?html`<div>
+          <div style=${{color:T.danger,fontWeight:700,fontSize:14,marginBottom:10}}>⚠️ Niveau bas — ${k.by} à ${fmtTime(k.at)}</div>
+          <button onClick=${()=>toggleKibble(l)} style=${{width:"100%",background:T.green,color:"#fff",border:"none",borderRadius:T.radius,padding:"12px",fontWeight:800,fontSize:14.5,cursor:"pointer",fontFamily:T.font}}>✓ Réapprovisionné</button>
+        </div>`:html`<div>
+          <div style=${{color:T.sub,fontSize:14,marginBottom:10}}>Stock OK</div>
+          <button onClick=${()=>toggleKibble(l)} style=${{width:"100%",background:`linear-gradient(180deg,${T.warnL},${T.warn})`,color:"#4A3A00",border:"none",borderRadius:T.radius,padding:"12px",fontWeight:800,fontSize:14.5,cursor:"pointer",fontFamily:T.font,boxShadow:"0 4px 10px rgba(0,0,0,.12)",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <svg width="20" height="20" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke="#4A3A00" strokeWidth="2"/><rect x="6.5" y="14" width="11" height="3.5" rx="1" fill="#4A3A00"/><path d="M12 6 l0 5 M9 9 l3 3 l3 -3" fill="none" stroke="#4A3A00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Niveau bas
+          </button>
+        </div>`}
+      </div>`;
     };
 
-    /* ===== COMPOSANT PRINCIPAL ===== */
-    function DogCare(){
-      const [state,setState]   = useState(null);
-      const [me,setMe]         = useState("");
-      const [showSettings,setShowSettings] = useState(false);
-      const [showWho,setShowWho]           = useState(false);
-      const [editIdx,setEditIdx]           = useState(null);
-      const [lastSync,setLastSync]         = useState(null);
-      const [nudge,setNudge]               = useState(false);
-      const [,setTick]                     = useState(0);
+    return html`<div style=${{minHeight:"100vh",background:T.bg,fontFamily:T.font,color:T.text,padding:"16px 14px 28px"}}>
+      <div style=${{maxWidth:560,margin:"0 auto"}}>
 
-      /* sync temps réel via Firebase onValue */
-      useEffect(()=>{
-        const ref = window._db.ref(DB_PATH);
-        const handler = ref.on('value', (snap) => {
-          const raw = snap.exists() ? snap.val() : null;
-          if(!raw){
-            const s = baseShape();
-            saveShared(s).then(()=>{ setState(s); setShowSettings(true); });
-          } else {
-            setState(fresh(raw));
-          }
-          setLastSync(new Date());
-        });
-        loadMe().then(m => setMe(m));
-        const t = setInterval(()=>setTick(x=>x+1), 60000);
-        return () => { ref.off('value', handler); clearInterval(t); };
-      }, []);
+        ${walkAlert  &&html`<${Banner} bg="#DC2626"  Glyph=${LeashGlyph}      text="Sortir le chien (plus de 4 h)"/>`}
+        ${matinAlert &&html`<${Banner} bg=${T.feed}  Glyph=${BowlGlyph}       text="Nourrir le chien — repas du matin"/>`}
+        ${soirAlert  &&html`<${Banner} bg=${T.feed}  Glyph=${BowlGlyph}       text="Nourrir le chien — repas du soir"/>`}
+        ${state.kibble.paris.low  &&html`<${Banner} bg=${T.kibble} Glyph=${KibbleLowGlyph} text="Croquettes à racheter — Paris"/>`}
+        ${state.kibble.vailly.low &&html`<${Banner} bg=${T.kibble} Glyph=${KibbleLowGlyph} text="Croquettes à racheter — Vailly"/>`}
 
-      useEffect(()=>{
-        if(state && state.members.every(x=>!x.trim())) setShowSettings(true);
-      },[state]);
-
-      const mutate = useCallback(async (fn) => {
-        const snap = await window._db.ref(DB_PATH).once('value');
-        const raw  = snap.exists() ? snap.val() : baseShape();
-        const next = fn(JSON.parse(JSON.stringify(fresh(raw))));
-        await saveShared(next);
-        // setState handled by onValue listener
-      }, []);
-
-      const requireMe = () => { if(!me){setNudge(true);setShowWho(true);setTimeout(()=>setNudge(false),2500);return false;}return true; };
-
-      const toggleMeal = (slot) => {
-        if(state[slot]){mutate(s=>{const by=s[slot]?.by;if(by)s.week.feed[by]=Math.max(0,(s.week.feed[by]||0)-1);s[slot]=null;return s;});return;}
-        if(!requireMe())return;
-        mutate(s=>{s[slot]={by:me,at:new Date().toISOString()};s.week.feed[me]=(s.week.feed[me]||0)+1;return s;});
-      };
-      const addWalk = () => {
-        if(!requireMe())return;
-        mutate(s=>{const iso=new Date().toISOString();s.walks.push({by:me,at:iso});s.lastWalkAt=iso;s.week.walk[me]=(s.week.walk[me]||0)+1;return s;});
-      };
-      const removeWalk = (i) => mutate(s=>{const by=s.walks[i]?.by;if(by)s.week.walk[by]=Math.max(0,(s.week.walk[by]||0)-1);s.walks.splice(i,1);s.lastWalkAt=s.walks.length?s.walks[s.walks.length-1].at:null;return s;});
-      const setWalkTime = (i,iso) => mutate(s=>{if(s.walks[i])s.walks[i].at=iso;s.walks.sort((a,b)=>new Date(a.at)-new Date(b.at));s.lastWalkAt=s.walks.length?s.walks[s.walks.length-1].at:null;return s;});
-      const toggleKibble = (loc) => {
-        if(!requireMe())return;
-        mutate(s=>{const c=s.kibble[loc];s.kibble[loc]=c.low?{low:false,by:null,at:null}:{low:true,by:me,at:new Date().toISOString()};return s;});
-      };
-
-      if(!state) return(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",fontSize:16,color:T.sub,fontFamily:T.font}}>Connexion en cours… 🐾</div>);
-
-      const members=state.members.filter(x=>x.trim());
-      const loc=probableLoc();
-      const now=new Date(),hour=now.getHours(),dow=now.getDay(),isWeekday=dow>=1&&dow<=5;
-      const sinceWalk=state.lastWalkAt?(now-new Date(state.lastWalkAt))/3600000:Infinity;
-      const walkAlert  = isWeekday&&hour>=7&&hour<21&&sinceWalk>4;
-      const matinAlert = hour>=7&&!state.matin;
-      const soirAlert  = hour>=18&&!state.soir;
-      const champFeed  = topOf(state.week.feed);
-      const champWalk  = topOf(state.week.walk);
-
-      const card = (e={}) => ({background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,padding:16,boxShadow:"0 1px 3px rgba(0,0,0,0.04)",...e});
-
-      const Banner = ({bg,glyph,text}) => (
-        <div style={{background:bg,color:"#fff",borderRadius:T.radius,padding:"11px 14px",fontWeight:800,fontSize:15.5,display:"flex",alignItems:"center",gap:12,marginBottom:9,boxShadow:"0 3px 12px rgba(0,0,0,0.16)",animation:"dcpulse 1.7s ease-in-out infinite"}}>
-          <span style={{width:38,height:38,borderRadius:"50%",background:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <svg width="24" height="24" viewBox="0 0 100 100">{glyph}</svg>
-          </span>
-          <span>{text}</span>
-        </div>
-      );
-
-      const KibbleCard = ({loc:l,name}) => {
-        const k=state.kibble[l], here=loc===l;
-        return(
-          <div style={card({border:k.low?`2px solid ${T.danger}`:`1px solid ${T.border}`,background:k.low?"#FEF2F2":T.card})}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-              <span style={{fontWeight:800,fontSize:16}}>📍 {name}</span>
-              {here&&<span style={{fontSize:11,fontWeight:700,color:T.blue,background:T.panel,padding:"3px 8px",borderRadius:20}}>lieu probable</span>}
-            </div>
-            {k.low?(<div>
-              <div style={{color:T.danger,fontWeight:700,fontSize:14,marginBottom:10}}>⚠️ Niveau bas — {k.by} à {fmtTime(k.at)}</div>
-              <button onClick={()=>toggleKibble(l)} style={{width:"100%",background:T.green,color:"#fff",border:"none",borderRadius:T.radius,padding:"12px",fontWeight:800,fontSize:14.5,cursor:"pointer",fontFamily:T.font}}>✓ Réapprovisionné</button>
-            </div>):(<div>
-              <div style={{color:T.sub,fontSize:14,marginBottom:10}}>Stock OK</div>
-              <button onClick={()=>toggleKibble(l)} style={{width:"100%",background:`linear-gradient(180deg,${T.warnL},${T.warn})`,color:"#4A3A00",border:"none",borderRadius:T.radius,padding:"12px",fontWeight:800,fontSize:14.5,cursor:"pointer",fontFamily:T.font,boxShadow:"0 4px 10px rgba(0,0,0,.12)",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                <svg width="20" height="20" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke="#4A3A00" strokeWidth="2"/><rect x="6.5" y="14" width="11" height="3.5" rx="1" fill="#4A3A00"/><path d="M12 6 l0 5 M9 9 l3 3 l3 -3" fill="none" stroke="#4A3A00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                Niveau bas
-              </button>
-            </div>)}
-          </div>
-        );
-      };
-
-      return(
-        <div style={{minHeight:"100vh",background:T.bg,fontFamily:T.font,color:T.text,padding:"16px 14px 28px"}}>
-          <style>{`@keyframes dcpulse{0%,100%{opacity:1}50%{opacity:.78}}`}</style>
-          <div style={{maxWidth:560,margin:"0 auto"}}>
-
-            {walkAlert  && <Banner bg="#DC2626"  glyph={<LeashGlyph/>}      text="Sortir le chien (plus de 4 h)"/>}
-            {matinAlert && <Banner bg={T.feed}   glyph={<BowlGlyph/>}       text="Nourrir le chien — repas du matin"/>}
-            {soirAlert  && <Banner bg={T.feed}   glyph={<BowlGlyph/>}       text="Nourrir le chien — repas du soir"/>}
-            {state.kibble.paris.low  && <Banner bg={T.kibble} glyph={<KibbleLowGlyph/>} text="Croquettes à racheter — Paris"/>}
-            {state.kibble.vailly.low && <Banner bg={T.kibble} glyph={<KibbleLowGlyph/>} text="Croquettes à racheter — Vailly"/>}
-
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <span style={{fontSize:28}}>🐾</span>
-                <div>
-                  <div style={{fontWeight:900,fontSize:20,lineHeight:1.1}}>{state.dogName?.trim()||"Suivi du chien"}</div>
-                  <div style={{fontSize:12,color:T.sub,textTransform:"capitalize"}}>{fmtDate()}</div>
-                </div>
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <span style={{fontSize:11,color:T.sub}}>{lastSync?`sync ${fmtTime(lastSync.toISOString())}`:""}</span>
-                <button onClick={()=>setShowSettings(true)} style={{background:T.panel,border:"none",borderRadius:12,padding:"8px 10px",cursor:"pointer",fontSize:16}}>⚙️</button>
-              </div>
-            </div>
-
-            <div style={card({padding:12,marginBottom:14,border:nudge?`2px solid ${T.warn}`:`1px solid ${T.border}`})}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <span style={{fontSize:13,color:T.sub}}>Tu es&nbsp;:</span>
-                {me?<span style={{fontWeight:800,color:T.blue}}>{me}</span>:<span style={{fontWeight:700,color:T.warn,fontSize:13}}>👇 choisis ton prénom</span>}
-                <button onClick={()=>setShowWho(!showWho)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"5px 10px",fontSize:12,cursor:"pointer",color:T.sub,fontFamily:T.font}}>{showWho?"Fermer":"Changer"}</button>
-              </div>
-              {(showWho||!me)&&(<div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:10}}>
-                {members.length===0&&<span style={{fontSize:13,color:T.sub}}>Ajoute les prénoms dans ⚙️ réglages.</span>}
-                {members.map(n=>(<button key={n} onClick={()=>{setMe(n);saveMe(n);setShowWho(false);}} style={{background:me===n?T.blue:T.panel,color:me===n?"#fff":T.text,border:"none",borderRadius:20,padding:"8px 16px",fontWeight:700,cursor:"pointer",fontFamily:T.font,fontSize:14}}>{n}</button>))}
-              </div>)}
-            </div>
-
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
-              <div style={card({padding:12})}><MealBowl slot="matin" accent="sun"  label="Repas du matin" fed={!!state.matin} who={state.matin?.by} at={state.matin?.at} onClick={()=>toggleMeal("matin")}/></div>
-              <div style={card({padding:12})}><MealBowl slot="soir"  accent="moon" label="Repas du soir"  fed={!!state.soir}  who={state.soir?.by}  at={state.soir?.at}  onClick={()=>toggleMeal("soir")}/></div>
-            </div>
-
-            <div style={card()}>
-              <WalkBig count={state.walks.length} onClick={addWalk}/>
-              {state.walks.length>0&&(<div style={{marginTop:12,display:"flex",flexDirection:"column",gap:6}}>
-                {state.walks.map((w,i)=>(
-                  <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:T.panel,borderRadius:12,padding:"8px 12px",fontSize:14}}>
-                    <span>🕒 <button onClick={()=>setEditIdx(i)} style={{background:"none",border:"none",padding:0,font:"inherit",fontWeight:800,color:T.blue,cursor:"pointer",textDecoration:"underline dotted"}}>{fmtTime(w.at)}</button> ✎ · {w.by}</span>
-                    <button onClick={()=>removeWalk(i)} style={{background:"none",border:"none",color:T.sub,cursor:"pointer",fontSize:16}}>✕</button>
-                  </div>
-                ))}
-              </div>)}
-            </div>
-
-            <div style={{marginTop:18,marginBottom:8,fontSize:13,fontWeight:800,color:T.sub,textTransform:"uppercase",letterSpacing:0.5}}>🥣 Niveau de croquettes</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              <KibbleCard loc="paris" name="Paris"/><KibbleCard loc="vailly" name="Vailly"/>
-            </div>
-
-            <div style={{marginTop:18,marginBottom:8,fontSize:13,fontWeight:800,color:T.sub,textTransform:"uppercase",letterSpacing:0.5}}>🏆 Champions de la semaine</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              <Trophy id="feed" kind="feed" title="Meilleur nourrisseur" name={champFeed.name} count={champFeed.count} unit="repas"/>
-              <Trophy id="walk" kind="walk" title="Meilleur promeneur"   name={champWalk.name} count={champWalk.count} unit="sorties"/>
-            </div>
-
-            <div style={{textAlign:"center",marginTop:20,fontSize:11.5,color:T.sub,lineHeight:1.6}}>
-              👨‍👩‍👧‍👦 Synchronisation temps réel · alertes promenade en semaine<br/>
-              Repas & promenades : remise à zéro chaque jour · coupes : chaque lundi
+        <div style=${{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+          <div style=${{display:"flex",alignItems:"center",gap:10}}>
+            <span style=${{fontSize:28}}>🐾</span>
+            <div>
+              <div style=${{fontWeight:900,fontSize:20,lineHeight:1.1}}>${state.dogName?.trim()||"Suivi du chien"}</div>
+              <div style=${{fontSize:12,color:T.sub,textTransform:"capitalize"}}>${fmtDate()}</div>
             </div>
           </div>
-
-          {showSettings&&<SettingsModal initial={{dogName:state.dogName,members:state.members}} onClose={()=>setShowSettings(false)} onSave={({dogName,members})=>mutate(s=>{s.dogName=dogName;s.members=members.slice(0,6);return s;})}/>}
-          {editIdx!==null&&state.walks[editIdx]&&<ClockPicker initialIso={state.walks[editIdx].at} onCancel={()=>setEditIdx(null)} onConfirm={(iso)=>{setWalkTime(editIdx,iso);setEditIdx(null);}}/>}
+          <div style=${{display:"flex",alignItems:"center",gap:6}}>
+            <span style=${{fontSize:11,color:T.sub}}>${lastSync?`sync ${fmtTime(lastSync.toISOString())}`:""}</span>
+            <button onClick=${()=>setShowSettings(true)} style=${{background:T.panel,border:"none",borderRadius:12,padding:"8px 10px",cursor:"pointer",fontSize:16}}>⚙️</button>
+          </div>
         </div>
-      );
-    }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<DogCare/>);
-  </script>
+        <div style=${card({padding:12,marginBottom:14,border:nudge?`2px solid ${T.warn}`:`1px solid ${T.border}`})}>
+          <div style=${{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style=${{fontSize:13,color:T.sub}}>Tu es :</span>
+            ${me?html`<span style=${{fontWeight:800,color:T.blue}}>${me}</span>`:html`<span style=${{fontWeight:700,color:T.warn,fontSize:13}}>👇 choisis ton prénom</span>`}
+            <button onClick=${()=>setShowWho(!showWho)} style=${{background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"5px 10px",fontSize:12,cursor:"pointer",color:T.sub,fontFamily:T.font}}>${showWho?"Fermer":"Changer"}</button>
+          </div>
+          ${(showWho||!me)&&html`<div style=${{display:"flex",flexWrap:"wrap",gap:8,marginTop:10}}>
+            ${members.length===0&&html`<span style=${{fontSize:13,color:T.sub}}>Ajoute les prénoms dans ⚙️ réglages.</span>`}
+            ${members.map(n=>html`<button key=${n} onClick=${()=>{setMe(n);saveMe(n);setShowWho(false);}} style=${{background:me===n?T.blue:T.panel,color:me===n?"#fff":T.text,border:"none",borderRadius:20,padding:"8px 16px",fontWeight:700,cursor:"pointer",fontFamily:T.font,fontSize:14}}>${n}</button>`)}
+          </div>`}
+        </div>
+
+        <div style=${{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+          <div style=${card({padding:12})}><${MealBowl} slot="matin" accent="sun"  label="Repas du matin" fed=${!!state.matin} who=${state.matin?.by} at=${state.matin?.at} onClick=${()=>toggleMeal("matin")}/></div>
+          <div style=${card({padding:12})}><${MealBowl} slot="soir"  accent="moon" label="Repas du soir"  fed=${!!state.soir}  who=${state.soir?.by}  at=${state.soir?.at}  onClick=${()=>toggleMeal("soir")}/></div>
+        </div>
+
+        <div style=${card()}>
+          <${WalkBig} count=${state.walks.length} onClick=${addWalk}/>
+          ${state.walks.length>0&&html`<div style=${{marginTop:12,display:"flex",flexDirection:"column",gap:6}}>
+            ${state.walks.map((w,i)=>html`<div key=${i} style=${{display:"flex",alignItems:"center",justifyContent:"space-between",background:T.panel,borderRadius:12,padding:"8px 12px",fontSize:14}}>
+              <span>🕒 <button onClick=${()=>setEditIdx(i)} style=${{background:"none",border:"none",padding:0,font:"inherit",fontWeight:800,color:T.blue,cursor:"pointer",textDecoration:"underline dotted"}}>${fmtTime(w.at)}</button> ✎ · ${w.by}</span>
+              <button onClick=${()=>removeWalk(i)} style=${{background:"none",border:"none",color:T.sub,cursor:"pointer",fontSize:16}}>✕</button>
+            </div>`)}
+          </div>`}
+        </div>
+
+        <div style=${{marginTop:18,marginBottom:8,fontSize:13,fontWeight:800,color:T.sub,textTransform:"uppercase",letterSpacing:0.5}}>🥣 Niveau de croquettes</div>
+        <div style=${{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <${KibbleCard} loc="paris" name="Paris"/>
+          <${KibbleCard} loc="vailly" name="Vailly"/>
+        </div>
+
+        <div style=${{marginTop:18,marginBottom:8,fontSize:13,fontWeight:800,color:T.sub,textTransform:"uppercase",letterSpacing:0.5}}>🏆 Champions de la semaine</div>
+        <div style=${{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <${Trophy} id="feed" kind="feed" title="Meilleur nourrisseur" name=${champFeed.name} count=${champFeed.count} unit="repas"/>
+          <${Trophy} id="walk" kind="walk" title="Meilleur promeneur"   name=${champWalk.name} count=${champWalk.count} unit="sorties"/>
+        </div>
+
+        <div style=${{textAlign:"center",marginTop:20,fontSize:11.5,color:T.sub,lineHeight:1.6}}>
+          👨‍👩‍👧‍👦 Synchronisation temps réel · alertes promenade en semaine<br/>
+          Repas & promenades : remise à zéro chaque jour · coupes : chaque lundi
+        </div>
+      </div>
+
+      ${showSettings&&html`<${SettingsModal} initial=${{dogName:state.dogName,members:state.members}} onClose=${()=>setShowSettings(false)} onSave=${({dogName,members})=>mutate(s=>{s.dogName=dogName;s.members=members.slice(0,6);return s;})}/>`}
+      ${editIdx!==null&&state.walks[editIdx]&&html`<${ClockPicker} initialIso=${state.walks[editIdx].at} onCancel=${()=>setEditIdx(null)} onConfirm=${(iso)=>{setWalkTime(editIdx,iso);setEditIdx(null);}}/>`}
+    </div>`;
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(html`<${DogCare}/>`);
+</script>
 </body>
 </html>
