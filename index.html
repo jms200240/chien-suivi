@@ -28,13 +28,13 @@
   <script>
     // ─── ⚙️  COLLE ICI TA CONFIG FIREBASE ───────────────────────────────────
     const firebaseConfig = {
-      apiKey: "AIzaSyCXiy1Y0nv5dFRw8Nf2yoQLAFnxBzfdxdU",
-      authDomain: "chien-suivi-7d81e.firebaseapp.com",
-      databaseURL: "https://chien-suivi-7d81e-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "chien-suivi-7d81e",
-      storageBucket: "chien-suivi-7d81e.firebasestorage.app",
-      messagingSenderId: "38280363095",
-      appId: "1:38280363095:web:05e5dde3f831af7c93b712"
+     apiKey: "AIzaSyCXiy1Y0nv5dFRw8Nf2yoQLAFnxBzfdxdU",
+     authDomain: "chien-suivi-7d81e.firebaseapp.com",
+     databaseURL: "https://chien-suivi-7d81e-default-rtdb.europe-west1.firebasedatabase.app",
+     projectId: "chien-suivi-7d81e",
+     storageBucket: "chien-suivi-7d81e.firebasestorage.app",
+     messagingSenderId: "38280363095",
+     appId: "1:38280363095:web:05e5dde3f831af7c93b712"
     };
     // ────────────────────────────────────────────────────────────────────────
     firebase.initializeApp(firebaseConfig);
@@ -47,11 +47,15 @@
   const {useState,useEffect,useCallback} = React;
   const html = htm.bind(React.createElement);
 
-  const DB_PATH = 'dogcare/v1/state';
-  const ME_KEY  = 'dogcare:me:v4';
+  const DB_PATH   = 'dogcare/v1/state';
+  const ME_KEY    = 'dogcare:me:v4';
+  const LOCAL_KEY = 'dogcare:local:state';
 
   const loadShared = async () => { try{const s=await window._db.ref(DB_PATH).once('value');return s.exists()?s.val():null;}catch{return null;} };
-  const saveShared = async (s) => { try{await window._db.ref(DB_PATH).set(s);}catch(e){console.error(e);} };
+  const saveShared = async (s) => {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(s));
+    try{await window._db.ref(DB_PATH).set(s);}catch(e){console.error(e);}
+  };
   const loadMe  = async () => localStorage.getItem(ME_KEY)||"";
   const saveMe  = async (n) => localStorage.setItem(ME_KEY,n);
 
@@ -234,11 +238,22 @@
     const [,setTick]=useState(0);
 
     useEffect(()=>{
+      // 1. Affichage immédiat depuis le cache local
+      try {
+        const cached = localStorage.getItem(LOCAL_KEY);
+        if (cached) setState(fresh(JSON.parse(cached)));
+      } catch {}
+
+      // 2. Sync Firebase en arrière-plan
       const ref=window._db.ref(DB_PATH);
       const handler=ref.on('value',(snap)=>{
         const raw=snap.exists()?snap.val():null;
         if(!raw){const s=baseShape();saveShared(s).then(()=>{setState(s);setShowSettings(true);});}
-        else setState(fresh(raw));
+        else {
+          const s=fresh(raw);
+          localStorage.setItem(LOCAL_KEY,JSON.stringify(s));
+          setState(s);
+        }
         setLastSync(new Date());
       });
       loadMe().then(m=>setMe(m));
